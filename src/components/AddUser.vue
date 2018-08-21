@@ -120,7 +120,6 @@ export default {
       phone: '',
       isChecked: false,
       isValid: false,
-      rawInput: '',
     };
   },
   validations() {
@@ -170,7 +169,8 @@ export default {
       };
 
       this.addUser(user);
-      this.$router.push('/');
+      this.resetAgreement();
+      this.resetFields();
     },
     onInput(field) {
       this.resetAgreement();
@@ -183,6 +183,12 @@ export default {
       if (this.isChecked) {
         this.isChecked = false;
       }
+    },
+    resetFields() {
+      this.username = '';
+      this.email = '';
+      this.website = '';
+      this.phone = '';
     },
     checkErrors() {
       this.isValid = !this.$v.$anyError;
