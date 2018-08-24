@@ -1,33 +1,43 @@
 <template>
   <section>
     <div class="container">
-      <form>
-        <div class="form-group">
-          <label for="id" class="col-sm-2 col-form-label">Id</label>
-          <input type="text" readonly class="form-control" id="id" :value="getNextUserId">
-        </div>
+      <div class="form">
+        <FormGroup>
+          <FormInput
+            v-bind="baseFields.id"
+            :value="getNextUserId"
+          ></FormInput>
+        </FormGroup>
 
-        <div class="form-group">
-          <label for="username">Username
-            <span class="required-field">*</span>
-          </label>
-          <input
-            type="text"
-            class="form-control"
-            id="username"
-            placeholder="Username"
-            :class="{ 'is-invalid': $v.username.$error, 'is-valid': !$v.username.$invalid }"
-            v-model.trim="$v.username.$model"
-            @input="onInput($v.username)"
+        <FormGroup>
+          <FormInput
+            v-bind="baseFields.username"
+            :isError="$v.username.$error"
+            :isValid="!$v.username.$invalid"
+            :isRequiredError="!$v.username.required && $v.username.alpha"
+            :isValidationError="$v.username.required && !$v.username.alpha"
+            @input="setField($event.target.value, 'username')"
             @blur="onBlur"
           >
-          <div class="invalid-feedback" v-if="!$v.username.required && $v.username.alpha">
-            Поле обязательно для заполнения
-          </div>
-          <div class="invalid-feedback" v-if="$v.username.required && !$v.username.alpha">
-            Поле должно содержать только латинские буквы
-          </div>
-        </div>
+            <template slot="requiredError">Поле обязательно для заполнения</template>
+            <template slot="validationError">Поле должно содержать только латинские буквы</template>
+          </FormInput>
+        </FormGroup>
+
+        <FormGroup>
+          <FormInput
+            v-bind="baseFields.email"
+            :isError="$v.email.$error"
+            :isValid="!$v.email.$invalid"
+            :isRequiredError="!$v.email.required && $v.email.email"
+            :isValidationError="$v.email.required && !$v.email.email"
+            @input="setField($event.target.value, 'email')"
+            @blur="onBlur"
+          >
+            <template slot="requiredError">Поле обязательно для заполнения</template>
+            <template slot="validationError">Адрес должен обязательно содержать символы «@» и «.».</template>
+          </FormInput>
+        </FormGroup>
 
         <div class="form-group">
           <label for="email">Email
@@ -85,8 +95,8 @@
         </div>
 
         <div class="form-group form-check">
-          <input type="checkbox" class="form-check-input" id="exampleCheck1" v-model="isChecked">
-          <label class="form-check-label" for="exampleCheck1">I agree to the terms & conditions</label>
+          <input type="checkbox" class="form-check-input" id="check" v-model="isChecked">
+          <label class="form-check-label" for="check">I agree to the terms & conditions</label>
         </div>
         <button
             type="submit"
@@ -94,7 +104,7 @@
             :disabled="isSubmitDisabled"
             @click.prevent="onSubmit"
         >Add User</button>
-      </form>
+      </div>
     </div>
   </section>
 </template>
@@ -104,10 +114,11 @@ import { mapState, mapActions } from 'vuex';
 import { required, email, helpers } from 'vuelidate/lib/validators';
 import { ValidationDelay } from '../mixins';
 import MaskedInput from 'vue-masked-input';
+import * as Regexp from '../tools/regexp'
 
-const alpha = helpers.regex('alpha', /^[a-zA-Z]*$/);
-const phone = helpers.regex('phone', /^(\+7|7|8)?[\s\-]?\(?[489][0-9]{2}\)?[\s\-]?[0-9]{3}[\s\-]?[0-9]{2}[\s\-]?[0-9]{2}$/);
-const url = helpers.regex('url', /^(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?$/);
+const alpha = helpers.regex('alpha', Regexp.alpha);
+const phone = helpers.regex('phone', Regexp.phone);
+const url = helpers.regex('url', Regexp.url);
 
 export default {
   name: 'AddUser',
@@ -120,6 +131,35 @@ export default {
       phone: '',
       isChecked: false,
       isValid: false,
+      baseFields: {
+        id: {
+          id: 'id',
+          label: 'Id',
+          readonly: 'readonly',
+        },
+        username: {
+          id: 'username',
+          label: 'Username',
+          placeholder: 'Username',
+          required: true,
+        },
+        email: {
+          id: 'email',
+          label: 'Email',
+          placeholder: 'mail@example.ru',
+          required: true,
+        },
+        website: {
+          id: 'website',
+          label: 'Website',
+          placeholder: 'example.ru',
+        },
+        phone: {
+          id: 'phone',
+          label: 'Phone',
+          placeholder: '79125555555',
+        },
+      }
     };
   },
   validations() {
@@ -141,7 +181,9 @@ export default {
     };
   },
   components: {
-    MaskedInput
+    MaskedInput,
+    FormGroup: require('./form/FormGroup').default,
+    FormInput: require('./form/FormInput').default,
   },
   computed: {
     getNextUserId() {
@@ -171,6 +213,7 @@ export default {
       this.addUser(user);
       this.resetAgreement();
       this.resetFields();
+      this.resetVuelidate();
     },
     onInput(field) {
       this.resetAgreement();
@@ -190,8 +233,18 @@ export default {
       this.website = '';
       this.phone = '';
     },
+    resetVuelidate() {
+      this.$v.$reset();
+    },
     checkErrors() {
       this.isValid = !this.$v.$anyError;
+    },
+    setField(value, field) {
+      this[field] = value.trim();
+      this.$v[field].$touch();
+
+      this.resetAgreement();
+      ValidationDelay.methods.validationDelay(this.$v[field]);
     },
 
     ...mapActions('users', [ 'addUser', 'fetchUsers' ]),
